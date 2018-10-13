@@ -1,20 +1,32 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 #[macro_use]
 extern crate arrayref;
 extern crate rand;
 extern crate rustc_serialize as serialize;
 extern crate secp256k1;
 extern crate sha2;
+extern crate uuid;
 
-use rand::{thread_rng, Rng};
-use secp256k1::{key, Message, Secp256k1, Signature};
-use sha2::{Digest, Sha256};
-//use std::convert::AsRef;
+mod bank;
+mod tx;
+mod util;
+
+use uuid::Uuid;
+
+use rand::thread_rng;
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use std::collections::HashMap;
+
+use crate::bank::Bank;
+use crate::tx::{Tx, TxIn, TxOut};
+use crate::util::hash_256_from_key;
 
 #[derive(Debug)]
 struct Transfer {
   message: Message,
   signature: Signature,
-  public_key: key::PublicKey,
+  public_key: PublicKey,
 }
 
 #[derive(Debug)]
@@ -22,55 +34,33 @@ struct ECDSACoin {
   transfers: Vec<Transfer>,
 }
 
-macro_rules! hex {
-  ($hex:expr) => {{
-    let mut vec = Vec::new();
-    let mut b = 0;
-    for (idx, c) in $hex.as_bytes().iter().enumerate() {
-      b <<= 4;
-      match *c {
-        b'A'...b'F' => b |= c - b'A' + 10,
-        b'a'...b'f' => b |= c - b'a' + 10,
-        b'0'...b'9' => b |= c - b'0',
-        _ => panic!("Bad hex"),
-      }
-      if (idx & 1) == 1 {
-        vec.push(b);
-        b = 0;
-      }
-    }
-    vec
-  }};
-}
-
-fn byteify(thing: &[u8]) -> [u8; 32] {
-  array_ref!(thing, 0, 32).clone()
-}
-
-fn hash_256(key: key::PublicKey) -> [u8; 32] {
-  let mut sha2 = Sha256::new();
-
-  // write input message
-  sha2.input(&key.serialize().as_ref());
-
-  // output
-  let result = sha2.result();
-
-  byteify(result.as_slice())
-}
-
-fn rando_msg() -> [u8; 32] {
-  let mut msg = [0u8; 32];
-  thread_rng().fill_bytes(&mut msg);
-  msg
-}
+// macro_rules! hex {
+//   ($hex:expr) => {{
+//     let mut vec = Vec::new();
+//     let mut b = 0;
+//     for (idx, c) in $hex.as_bytes().iter().enumerate() {
+//       b <<= 4;
+//       match *c {
+//         b'A'...b'F' => b |= c - b'A' + 10,
+//         b'a'...b'f' => b |= c - b'a' + 10,
+//         b'0'...b'9' => b |= c - b'0',
+//         _ => panic!("Bad hex"),
+//       }
+//       if (idx & 1) == 1 {
+//         vec.push(b);
+//         b = 0;
+//       }
+//     }
+//     vec
+//   }};
+// }
 
 impl ECDSACoin {
-  fn issue(public_key: key::PublicKey, bank_private_key: key::SecretKey) -> ECDSACoin {
+  fn issue(public_key: PublicKey, bank_private_key: SecretKey) -> ECDSACoin {
     let secp = Secp256k1::new();
     // public_key.serialize();
 
-    let message = Message::from_slice(&hash_256(public_key)).expect("32 bytes");
+    let message = Message::from_slice(&hash_256_from_key(public_key)).expect("32 bytes");
     // let message = Message::from_slice(&rando_msg()).expect("32 bytes");
     let signature = secp.sign(&message, &bank_private_key);
 
@@ -85,13 +75,9 @@ impl ECDSACoin {
   }
 }
 
-fn validate(
-  secp: Secp256k1<secp256k1::All>,
-  coin: ECDSACoin,
-  bank_public_key: key::PublicKey,
-) -> bool {
+fn validate(secp: Secp256k1<secp256k1::All>, coin: ECDSACoin, bank_public_key: PublicKey) -> bool {
   let transfer = &coin.transfers[0];
-  let message = Message::from_slice(&hash_256(transfer.public_key)).expect("32 bytes");
+  let message = Message::from_slice(&hash_256_from_key(transfer.public_key)).expect("32 bytes");
   secp
     .verify(&message, &transfer.signature, &bank_public_key)
     .is_ok()
@@ -106,19 +92,50 @@ fn main() {
   let (alice_secret_key, alice_public_key) = secp.generate_keypair(&mut rng);
   let (bob_secret_key, bob_public_key) = secp.generate_keypair(&mut rng);
 
-  let coin = ECDSACoin::issue(alice_public_key, bank_secret_key);
+  //Make a bank
+  let mut bank = Bank {
+    utxo: HashMap::new(),
+    secp: secp,
+  };
 
-  // println!("{:?}", coin);
+  //Mutate the bank by issuing coins to alice
+  let coinbase = bank.issue(1000, alice_public_key);
 
-  let message = Message::from_slice(&hash_256(alice_public_key)).expect("32 bytes");
+  let tx_ins = vec![TxIn {
+    tx_id: coinbase.id,
+    index: 0,
+    signature: None,
+  }];
 
-  // let sig = secp.sign(&message, &alice_secret_key);
-  // assert!(secp.verify(&message, &sig, &alice_public_key).is_ok());
-  assert!(
-    secp
-      .verify(&message, &coin.transfers[0].signature, &bank_public_key)
-      .is_ok()
-  );
+  let tx_id = Uuid::new_v4();
 
-  println!("{:?}", validate(secp, coin, bank_public_key));
+  //Build the transaction. Alice gives 10 to bob, 990 to herself.
+  let tx_outs = vec![
+    TxOut {
+      tx_id: tx_id,
+      index: 0,
+      amount: 10,
+      public_key: bob_public_key,
+    },
+    TxOut {
+      tx_id: tx_id,
+      index: 1,
+      amount: 990,
+      public_key: alice_public_key,
+    },
+  ];
+
+  let mut alice_to_bob = Tx {
+    id: tx_id,
+    tx_ins: tx_ins,
+    tx_outs: tx_outs,
+  };
+
+  //Sign it! (still haven't crashed)
+  alice_to_bob.sign_input(0, alice_secret_key);
+
+  //println!("alice_to_bob tx = {:?}", alice_to_bob);
+
+  //When the bank tries to verify, it doesn't like the signature or something
+  bank.handle_tx(alice_to_bob);
 }

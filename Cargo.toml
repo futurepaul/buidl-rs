@@ -9,8 +9,5 @@ rand = "0.4.3"
 sha2 = "0.8.0"
 rustc-serialize = "0.3.24"
 arrayref = "0.3.5"
-
-[dependencies.secp256k1]
-version = "0.11.2"
-
-features = ["rand"]
+uuid = { version = "0.7.1", features = ["v4"]}
+secp256k1 = {version = "0.11.2", features = ["rand"]}

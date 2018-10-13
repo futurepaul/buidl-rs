@@ -20,68 +20,6 @@ use std::collections::HashMap;
 
 use crate::bank::Bank;
 use crate::tx::{Tx, TxIn, TxOut};
-use crate::util::hash_256_from_key;
-
-#[derive(Debug)]
-struct Transfer {
-  message: Message,
-  signature: Signature,
-  public_key: PublicKey,
-}
-
-#[derive(Debug)]
-struct ECDSACoin {
-  transfers: Vec<Transfer>,
-}
-
-// macro_rules! hex {
-//   ($hex:expr) => {{
-//     let mut vec = Vec::new();
-//     let mut b = 0;
-//     for (idx, c) in $hex.as_bytes().iter().enumerate() {
-//       b <<= 4;
-//       match *c {
-//         b'A'...b'F' => b |= c - b'A' + 10,
-//         b'a'...b'f' => b |= c - b'a' + 10,
-//         b'0'...b'9' => b |= c - b'0',
-//         _ => panic!("Bad hex"),
-//       }
-//       if (idx & 1) == 1 {
-//         vec.push(b);
-//         b = 0;
-//       }
-//     }
-//     vec
-//   }};
-// }
-
-impl ECDSACoin {
-  fn issue(public_key: PublicKey, bank_private_key: SecretKey) -> ECDSACoin {
-    let secp = Secp256k1::new();
-    // public_key.serialize();
-
-    let message = Message::from_slice(&hash_256_from_key(public_key)).expect("32 bytes");
-    // let message = Message::from_slice(&rando_msg()).expect("32 bytes");
-    let signature = secp.sign(&message, &bank_private_key);
-
-    let transfer = Transfer {
-      message: message,
-      signature: signature,
-      public_key: public_key,
-    };
-    ECDSACoin {
-      transfers: vec![transfer],
-    }
-  }
-}
-
-fn validate(secp: Secp256k1<secp256k1::All>, coin: ECDSACoin, bank_public_key: PublicKey) -> bool {
-  let transfer = &coin.transfers[0];
-  let message = Message::from_slice(&hash_256_from_key(transfer.public_key)).expect("32 bytes");
-  secp
-    .verify(&message, &transfer.signature, &bank_public_key)
-    .is_ok()
-}
 
 fn main() {
   let secp = Secp256k1::new();

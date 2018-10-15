@@ -59,7 +59,7 @@ impl Bank {
       let tx_out = self.utxo.get(&tx_in.clone().outpoint()).unwrap();
 
       let verification = self.secp.verify(
-        &tx_in.message(),
+        &tx_in.spend_message(),
         &tx_in.signature.unwrap(),
         &tx_out.public_key,
       );

@@ -1,4 +1,3 @@
-use crate::util::messageify;
 use secp256k1::{PublicKey, Secp256k1, SecretKey, Signature};
 use uuid::Uuid;
 
@@ -14,9 +13,7 @@ pub struct Tx {
 
 impl Tx {
   pub fn sign_input(&mut self, index: usize, private_key: SecretKey) {
-    //TEMP
-    let message = messageify();
-    // let message = self.tx_ins[index].spend_message();
+    let message = self.tx_ins[index].spend_message();
     let secp = Secp256k1::new();
     let signature = secp.sign(&message, &private_key);
 
@@ -39,7 +36,7 @@ impl TxIn {
     }
   }
 
-  pub fn message(&self) -> secp256k1::Message {
+  pub fn spend_message(&self) -> secp256k1::Message {
     let message_string = format!("{}:{}", self.tx_id, self.tx_id);
     let hash = hash_256_from_string(message_string);
     secp256k1::Message::from_slice(&hash).expect("32 bytes")

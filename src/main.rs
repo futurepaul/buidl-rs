@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 #[macro_use]
 extern crate arrayref;
+extern crate hex;
 extern crate rand;
 extern crate rustc_serialize as serialize;
 extern crate secp256k1;

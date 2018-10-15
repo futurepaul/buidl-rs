@@ -77,7 +77,7 @@ impl Bank {
       out_sum += tx_out.amount;
     }
 
-    assert!(in_sum == out_sum);
+    assert!(in_sum == out_sum, "In sum doesn't match out sum");
   }
 
   pub fn handle_tx(&mut self, tx: Tx) {
@@ -85,7 +85,7 @@ impl Bank {
     self.update_utxo(&tx);
   }
 
-  fn fetch_utxo(&self, public_key: &PublicKey) -> Vec<TxOut> {
+  pub fn fetch_utxo(&self, public_key: &PublicKey) -> Vec<TxOut> {
     let mut tx_outs = Vec::new();
     for tx_out in self
       .utxo

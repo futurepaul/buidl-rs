@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
 #[macro_use]
 extern crate arrayref;
 extern crate hex;
@@ -73,8 +71,15 @@ fn main() {
   //Sign it! (still haven't crashed)
   alice_to_bob.sign_input(0, alice_secret_key);
 
-  //println!("alice_to_bob tx = {:?}", alice_to_bob);
-
-  //When the bank tries to verify, it doesn't like the signature or something
+  //Now we let the bank update the ledger
   bank.handle_tx(alice_to_bob);
+
+  assert_eq!(990, bank.fetch_balance(&alice_public_key));
+  assert_eq!(10, bank.fetch_balance(&bob_public_key));
+
+  println!(
+    "Alice has {} bankcoin, Bob has {} bankcoin. Good job.",
+    bank.fetch_balance(&alice_public_key),
+    bank.fetch_balance(&bob_public_key)
+  )
 }

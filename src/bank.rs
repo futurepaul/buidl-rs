@@ -65,7 +65,7 @@ impl Bank {
       );
 
       match verification {
-        Ok(_) => println!("Verified {:?}", tx_in.tx_id),
+        Ok(_) => println!("Verified tx with UUID: {}", tx_in.tx_id),
         Err(e) => panic!("Verification failed because: {}", e),
       }
 
@@ -80,8 +80,32 @@ impl Bank {
     assert!(in_sum == out_sum);
   }
 
-  pub fn handle_tx(mut self, tx: Tx) {
+  pub fn handle_tx(&mut self, tx: Tx) {
     self.validate_tx(tx.clone());
     self.update_utxo(&tx);
+  }
+
+  fn fetch_utxo(&self, public_key: &PublicKey) -> Vec<TxOut> {
+    let mut tx_outs = Vec::new();
+    for tx_out in self
+      .utxo
+      .values()
+      .filter(|&tx_out| tx_out.public_key == *public_key)
+    {
+      tx_outs.push(tx_out.clone());
+    }
+    tx_outs
+  }
+
+  pub fn fetch_balance(&self, public_key: &PublicKey) -> u64 {
+    let unspents = self.fetch_utxo(public_key);
+
+    let mut balance = 0;
+
+    for unspent in unspents.iter() {
+      balance += unspent.amount;
+    }
+
+    balance
   }
 }

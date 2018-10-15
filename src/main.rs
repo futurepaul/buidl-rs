@@ -14,7 +14,7 @@ mod util;
 use uuid::Uuid;
 
 use rand::thread_rng;
-use secp256k1::{Message, PublicKey, Secp256k1, SecretKey, Signature};
+use secp256k1::Secp256k1;
 use std::collections::HashMap;
 
 use crate::bank::Bank;
@@ -25,9 +25,9 @@ fn main() {
   let mut rng = thread_rng();
 
   //Create the public / private keys
-  let (bank_secret_key, bank_public_key) = secp.generate_keypair(&mut rng);
+  let (_bank_secret_key, _bank_public_key) = secp.generate_keypair(&mut rng);
   let (alice_secret_key, alice_public_key) = secp.generate_keypair(&mut rng);
-  let (bob_secret_key, bob_public_key) = secp.generate_keypair(&mut rng);
+  let (_bob_secret_key, bob_public_key) = secp.generate_keypair(&mut rng);
 
   //Make a bank
   let mut bank = Bank {
